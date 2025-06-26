@@ -702,6 +702,7 @@ if __name__ == '__main__':
             setattr(s, 'current_chat_id_ui', chat_id),
             setattr(s, 'messages_history', [{"role": "assistant", "content": f"Content for {chat_id}"}])
         ),
+
         'process_uploaded_file_callback': None, # Placeholder, will be replaced by the function below
         'remove_uploaded_file_callback': lambda s, name, ftype: (
             s.notify("info", f"Mock: File '{name}' removed."),
@@ -777,6 +778,7 @@ if __name__ == '__main__':
     # The Gui instance is now created and configured in init_ui.
     # For it to find callables in *this* module when run from here:
     gui_instance._set_frame(globals())
+
 
     # Define the mock callback as a full function
     def mock_process_uploaded_file_callback_fn(s: State, name: str, content: bytes):
