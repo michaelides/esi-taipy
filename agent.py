@@ -1,5 +1,4 @@
 import os
-import streamlit as st # Import streamlit to access session state
 from llama_index.core import Settings
 from llama_index.llms.gemini import Gemini
 from llama_index.embeddings.google_genai import GoogleGenAIEmbedding
@@ -108,8 +107,8 @@ def create_orchestrator_agent(dynamic_tools: List[FunctionTool] = None, max_sear
     print("Initializing all tools for the comprehensive agent...")
 
     # Initialize all static tools
-    search_tools = get_search_tools()
-    lit_reviewer_tool = get_semantic_scholar_tool_for_agent() # This returns a single FunctionTool
+    search_tools = get_search_tools(max_results=max_search_results) # Pass max_search_results
+    lit_reviewer_tool = get_semantic_scholar_tool_for_agent(max_results=max_search_results) # Pass max_search_results
     web_scraper_tool = get_web_scraper_tool_for_agent() # This returns a single FunctionTool
     rag_tool = get_rag_tool_for_agent() # This returns a single FunctionTool
     coder_tools = get_coder_tools()

@@ -290,13 +290,15 @@ def get_rag_tool_for_agent():
 
 # --- Tool Collections for Specialized Agents ---
 
-def get_search_tools(max_results: int = 5):
+def get_search_tools(max_results: int = 5): # max_results is more of a hint here for DDG/Tavily
     """Initializes and returns a list of search-related tools."""
     tools = []
-    # Pass max_results to the tool's query method if needed, not the constructor
-    ddg_tool = get_duckduckgo_tool() 
-    tavily_tool = get_tavily_tool()
-    wiki_tool = get_wikipedia_tool()
+    # For DDG and Tavily, max_results is not directly used in FunctionTool creation easily.
+    # The agent should ideally use this as a guideline when querying or processing results.
+    # Semantic Scholar tool handles max_results directly.
+    ddg_tool = get_duckduckgo_tool(max_results=max_results)
+    tavily_tool = get_tavily_tool(max_results=max_results)
+    wiki_tool = get_wikipedia_tool() # Wikipedia tool does not typically take max_results in this way
 
     if ddg_tool: tools.append(ddg_tool)
     if tavily_tool: tools.append(tavily_tool)
