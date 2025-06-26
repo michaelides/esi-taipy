@@ -702,12 +702,8 @@ if __name__ == '__main__':
             setattr(s, 'current_chat_id_ui', chat_id),
             setattr(s, 'messages_history', [{"role": "assistant", "content": f"Content for {chat_id}"}])
         ),
-        'process_uploaded_file_callback': lambda s, name, content: (
-            s.notify("success", f"Mock: File '{name}' processed."),
-            # Add to uploaded_files_display for table
-            s.uploaded_files_display += [{"id": name, "name": name, "type": "doc" if name.endswith((".pdf",".docx")) else "df", "icon": "📄" if name.endswith((".pdf",".docx")) else "📊", "actions": "<|button|on_action=on_uploaded_file_table_action|label=Delete|class_name=taipy-error|action=delete|>"}]
 
-        ),
+        'process_uploaded_file_callback': None, # Placeholder, will be replaced by the function below
         'remove_uploaded_file_callback': lambda s, name, ftype: (
             s.notify("info", f"Mock: File '{name}' removed."),
             setattr(s, 'uploaded_files_display', [f for f in s.uploaded_files_display if f['name'] != name])
@@ -783,6 +779,22 @@ if __name__ == '__main__':
     # For it to find callables in *this* module when run from here:
     gui_instance._set_frame(globals())
 
+
+    # Define the mock callback as a full function
+    def mock_process_uploaded_file_callback_fn(s: State, name: str, content: bytes):
+        s.notify("success", f"Mock: File '{name}' processed.")
+        # Add to uploaded_files_display for table
+        # Ensure s.uploaded_files_display is treated as a list that Taipy can update reactively
+        current_files = list(s.uploaded_files_display) # Make a copy
+        current_files.append({"id": name, "name": name,
+                              "type": "doc" if name.endswith((".pdf",".docx")) else "df",
+                              "icon": "📄" if name.endswith((".pdf",".docx")) else "📊",
+                              "actions": f"<|button|on_action=on_uploaded_file_table_action|label=Delete|class_name=taipy-error|action=delete|file_id={name}|>"})
+        s.uploaded_files_display = current_files
+
+
+    # Assign the actual function to the callback dictionary
+    mock_app_callbacks['process_uploaded_file_callback'] = mock_process_uploaded_file_callback_fn
 
     gui_instance.run(run_server=True, port=5001, title="ESI Taipy UI Test", dark_mode=False, use_reloader=True)
     # if os.path.exists(temp_css_file):
