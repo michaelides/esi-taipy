@@ -187,11 +187,12 @@ Never use the word "Ah". "Ah" is prohibited.
 """
     # Note: FunctionAgent can take tools that are Python functions directly,
     # or FunctionTool objects. `all_tools` is already a list of FunctionTool objects.
-    agent = FunctionAgent.from_defaults( # Using from_defaults if it exists, or direct constructor
+    agent = FunctionAgent(
         tools=all_tools,
         llm=Settings.llm,
-        system_prompt=comprehensive_system_prompt,
-        # verbose=True, # FunctionAgent might not have verbose in constructor, verbosity is often managed by callback handlers or logging
+        system_prompt=comprehensive_system_prompt
+        # verbose=True, # verbose is not a standard param for FunctionAgent constructor, managed by logging or callbacks
+
     )
     # comprehensive_agent_worker = FunctionCallingAgentWorker.from_tools(
     #     tools=all_tools,
