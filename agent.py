@@ -2,10 +2,11 @@ import os
 from llama_index.core import Settings
 from llama_index.llms.gemini import Gemini
 from llama_index.embeddings.google_genai import GoogleGenAIEmbedding
-from llama_index.core.agent import AgentRunner, FunctionCallingAgentWorker
+# from llama_index.core.agent import AgentRunner, FunctionCallingAgentWorker # Old imports
+from llama_index.core.agent.workflow import FunctionAgent # New import
 from typing import Any, List, Dict
-from llama_index.core.tools import FunctionTool # Ensure FunctionTool is imported
-from llama_index.core.llms import LLM # Import base LLM type for type hinting
+from llama_index.core.tools import FunctionTool
+from llama_index.core.llms import LLM
 
 from tools import (
     get_search_tools,
@@ -88,9 +89,9 @@ def generate_llm_greeting() -> str:
 
 
 # --- Comprehensive Agent Definition ---
-def create_orchestrator_agent(dynamic_tools: List[FunctionTool] = None, max_search_results: int = 10) -> AgentRunner:
+def create_orchestrator_agent(dynamic_tools: List[FunctionTool] = None, max_search_results: int = 10) -> FunctionAgent: # Changed return type
     """
-    Creates a single comprehensive agent that has access to all specialized tools.
+    Creates a single comprehensive agent that has access to all specialized tools using FunctionAgent.
     This agent will act as the primary interface, leveraging various tools as needed.
 
     Args:
@@ -184,16 +185,24 @@ Your final output to the user should be a single, complete response directly add
 Never use the word "Ah". "Ah" is prohibited.
 
 """
-
-    comprehensive_agent_worker = FunctionCallingAgentWorker.from_tools(
+    # Note: FunctionAgent can take tools that are Python functions directly,
+    # or FunctionTool objects. `all_tools` is already a list of FunctionTool objects.
+    agent = FunctionAgent(
         tools=all_tools,
         llm=Settings.llm,
-        system_prompt=comprehensive_system_prompt,
-        verbose=True, # Set to False for production
+        system_prompt=comprehensive_system_prompt
+        # verbose=True, # verbose is not a standard param for FunctionAgent constructor, managed by logging or callbacks
+
     )
-    comprehensive_agent_runner = AgentRunner(comprehensive_agent_worker)
-    print("Comprehensive agent created with all expert tools.")
-    return comprehensive_agent_runner
+    # comprehensive_agent_worker = FunctionCallingAgentWorker.from_tools(
+    #     tools=all_tools,
+    #     llm=Settings.llm,
+    #     system_prompt=comprehensive_system_prompt,
+    #     verbose=True, # Set to False for production
+    # )
+    # comprehensive_agent_runner = AgentRunner(comprehensive_agent_worker) # Deprecated
+    print("Comprehensive FunctionAgent created with all expert tools.")
+    return agent
 
 # --- Suggested Prompts ---
 DEFAULT_PROMPTS = [
