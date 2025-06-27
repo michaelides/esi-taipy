@@ -68,19 +68,20 @@ def initialize_user_session_data_taipy(state: State) -> None:
         pass # Let globals handle it. Accessing it in on_taipy_init might be the issue.
 
 def on_taipy_init(state: State):
-    print("Minimal Taipy on_init called. Session initializing.")
+    print("Minimal Taipy on_init called. Session initializing. (No state access in this version)")
     # initialize_user_session_data_taipy(state) # Further simplify: comment out for now
-    # Check if simple_message is accessible
-    try:
-        print(f"Minimal on_init: state.simple_message = {state.simple_message}")
-    except Exception as e:
-        print(f"Minimal on_init: Error accessing state.simple_message: {e}")
+    # Check if simple_message is accessible - REMOVED for this test
+    # try:
+    #     print(f"Minimal on_init: state.simple_message = {state.simple_message}")
+    # except Exception as e:
+    #     print(f"Minimal on_init: Error accessing state.simple_message: {e}")
 
     # If ui.py still has long_term_memory_enabled_ui in its state_vars for some reason,
     # ensure it's on the state to avoid errors if Taipy tries to bind it.
     # This should be set via the `globals` argument in `gui.run`.
-    if not hasattr(state, 'long_term_memory_enabled_ui'):
-        print("Minimal on_init: 'long_term_memory_enabled_ui' still not found. This is unexpected if initial_taipy_state included it for globals.")
+    # if not hasattr(state, 'long_term_memory_enabled_ui'): # REMOVED for this test
+    #     print("Minimal on_init: 'long_term_memory_enabled_ui' still not found. This is unexpected if initial_taipy_state included it for globals.")
+
 
 
 def main_taipy():
