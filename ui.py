@@ -83,20 +83,20 @@ main_page_md = """
             <|button|on_action=open_forget_me_dialog|class_name=taipy-error|>Forget Me (Delete All Data)</|button|>
         |>
         <|expandable|title=About ESI|expanded=False|
-            <|text|ESI: ESI Scholarly Instructor - Your AI partner for dissertation research.|mode=md|>
-            <|text|⚠️ Always consult your supervisor for final guidance and decisions.|mode=md|>
-            <|text|Made for NBS7091A and NBS7095x|mode=md|>
+            <|text|value=ESI: ESI Scholarly Instructor - Your AI partner for dissertation research.|mode=md|>
+            <|text|value=⚠️ Always consult your supervisor for final guidance and decisions.|mode=md|>
+            <|text|value=Made for NBS7091A and NBS7095x|mode=md|>
         |>
     |>
 
     <|part|class_name=chat_area|
         <|navbar|>
         # 🎓 ESI: ESI Scholarly Instructor
-        <|text|Your AI partner for brainstorming and structuring your dissertation research|mode=md|>
+        <|text|value=Your AI partner for brainstorming and structuring your dissertation research|mode=md|>
 
         <div class="chat-container" style="height: 60vh; overflow-y: auto; border: 1px solid #ccc; padding: 10px; margin-bottom:10px;">
         <|part|render={len(messages_history) > 0}|
-            <|repeater|data={messages_history}|
+            <|repeater|data={messages_history}|>
                 <|layout|columns=auto 1fr|class_name={class_name_for_message(item)}|
                     <|text|{get_avatar_for_message(item)}|class_name=avatar|>
                     <|text|{get_content_for_message(item)}|mode=md|class_name=message_content|>
@@ -656,27 +656,32 @@ def init_ui(app_callbacks_from_app: Dict[str, Callable], initial_state_from_app:
     # Taipy should be able to discover functions and variables from this module automatically
     # when the Gui is run from app.py, as long as ui.py is imported correctly.
 
-
     # Embed GLOBAL_CSS directly into the Markdown content
     full_main_page_md = f"<style>{GLOBAL_CSS}</style>\n{main_page_md}"
 
     gui.add_shared_variables(initial_state_from_app) # Make initial state accessible to Markdown bindings
 
     # Define the page within the gui instance context
-    # Functions like class_name_for_message should now be discoverable from ui.py's context
-    gui.add_page("main", Markdown(full_main_page_md),
-                 # Explicitly provide functions to the page if _set_frame isn't enough
-                 # or if preferred. These are functions used in the Markdown.
-                 # Note: This makes them available to *this page*. _set_frame is more global for the Gui instance.
-                 # Binding them here ensures they are known for this page.
-                 # This is a more robust way for page-specific functions.
-                 # However, _set_frame should ideally cover this. Let's try _set_frame first.
-                 # If warnings persist, we can add them here explicitly.
-                 # Example:
-                 # class_name_for_message=class_name_for_message,
-                 # get_avatar_for_message=get_avatar_for_message,
-                 # ... and so on for all functions used in main_page_md
-                 )
+    # Explicitly pass helper functions used in Markdown to the page context
+    page_functions = {
+        "class_name_for_message": class_name_for_message,
+        "get_avatar_for_message": get_avatar_for_message,
+        "get_content_for_message": get_content_for_message,
+        "has_download_or_image": has_download_or_image,
+        "get_download_or_image_html": get_download_or_image_html,
+        "has_rag_sources": has_rag_sources,
+        "get_rag_sources_html": get_rag_sources_html,
+        "is_last_assistant_message": is_last_assistant_message,
+        "chat_history_adapter": chat_history_adapter
+        # Add any other functions from ui.py that are directly called from main_page_md
+        # Callbacks like on_action=... are usually discovered automatically if they are in this module.
+    }
+
+    gui.add_page(
+        name="main",
+        page=Markdown(full_main_page_md),
+        **page_functions
+    )
 
     return gui
 
