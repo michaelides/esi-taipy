@@ -672,6 +672,38 @@ def init_ui(app_callbacks_from_app: Dict[str, Callable], initial_state_from_app:
 
     gui.add_shared_variables(initial_state_from_app) # Make initial state accessible to Markdown bindings
 
+    # Explicitly provide functions to the page context
+    page_callables = {
+        # Functions used in expressions
+        "class_name_for_message": class_name_for_message,
+        "get_avatar_for_message": get_avatar_for_message,
+        "get_content_for_message": get_content_for_message,
+        "has_download_or_image": has_download_or_image,
+        "get_download_or_image_html": get_download_or_image_html,
+        "has_rag_sources": has_rag_sources,
+        "get_rag_sources_html": get_rag_sources_html,
+        "is_last_assistant_message": is_last_assistant_message,
+        # Adapter
+        "chat_history_adapter": chat_history_adapter,
+        # Callbacks defined in ui.py (Taipy usually finds these by name, but explicit is safer)
+        "new_chat_action": new_chat_action,
+        "on_chat_menu_action": on_chat_menu_action,
+        "request_rename_chat_action": request_rename_chat_action,
+        "request_delete_chat_action": request_delete_chat_action,
+        "download_chat_md_action": download_chat_md_action,
+        "download_chat_docx_action": download_chat_docx_action,
+        "handle_file_upload_action": handle_file_upload_action,
+        "on_uploaded_file_table_action": on_uploaded_file_table_action,
+        "on_llm_setting_change": on_llm_setting_change,
+        "open_forget_me_dialog": open_forget_me_dialog,
+        "dialog_action_forget_me": dialog_action_forget_me,
+        "dialog_action_rename_chat": dialog_action_rename_chat,
+        "on_suggested_prompt_action": on_suggested_prompt_action,
+        "on_chat_input_action": on_chat_input_action,
+        "copy_message_action": copy_message_action,
+        "regenerate_response_action": regenerate_response_action
+    }
+
     # Define the page within the gui instance context
     # Functions like class_name_for_message (defined in this ui.py module)
     # should be discoverable by Taipy when it parses main_page_md,

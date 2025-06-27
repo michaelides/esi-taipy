@@ -551,6 +551,7 @@ def on_taipy_init(state: State):
 
     initialize_user_session_data_taipy(state)
 
+
     if not state.messages_history:
         if not _APP_CONTEXT.get("initial_greeting_shown_for_session"):
             create_new_chat_session_taipy(state)
@@ -612,6 +613,7 @@ def main_taipy():
 
     gui_instance = ui.init_ui(app_callbacks_for_ui, initial_taipy_state)
     gui_instance.on_init = on_taipy_init
+
 
     os.makedirs(UI_ACCESSIBLE_WORKSPACE, exist_ok=True)
 
