@@ -2,6 +2,7 @@ import os
 import json
 import re
 import sys
+
 import uuid
 from typing import List, Dict, Any, Optional, Callable, Generator, Tuple
 from functools import lru_cache
@@ -57,6 +58,7 @@ _APP_CONTEXT: Dict[str, Any] = {
 
 # Simplified initialize_user_session_data_taipy for minimal test
 def initialize_user_session_data_taipy(state: State) -> None:
+
     print("Minimal initialize_user_session_data_taipy called.")
     # We expect 'simple_message' to be set via globals in gui.run()
     # If 'long_term_memory_enabled_ui' is needed by ui.py's structure (even if not used), ensure it exists.
@@ -74,6 +76,7 @@ def on_taipy_init(state: State):
     try:
         print(f"Minimal on_init: state.simple_message = {state.simple_message}")
     except Exception as e:
+
         print(f"Minimal on_init: Error accessing state.simple_message: {e}")
 
     # If ui.py still has long_term_memory_enabled_ui in its state_vars for some reason,
@@ -109,6 +112,7 @@ def main_taipy():
     
     # Minimal callbacks
     app_callbacks_for_ui = {}
+
 
     gui_instance = ui.init_ui(app_callbacks_for_ui, initial_taipy_state)
     gui_instance.on_init = on_taipy_init
