@@ -4,7 +4,7 @@ import json
 import re
 import uuid
 # import extra_streamlit_components as esc # REMOVED
-from typing import List, Dict, Any, Optional, Callable, Tuple # Added Optional, Callable, Tuple
+from typing import List, Dict, Any, Optional, Callable, Generator, Tuple # Added Optional, Callable, Tuple
 from functools import lru_cache # For caching similar to st.cache_data / st.cache_resource
 import pandas as pd
 from PyPDF2 import PdfReader # For PDF processing

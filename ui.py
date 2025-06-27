@@ -8,8 +8,9 @@ import pandas as pd
 # from docx import Document # Will be handled by app.py or agent
 import io
 import inspect # For get_module_name_from_frame if needed, or for explicit callable registration
+import sys
 
-from taipy.gui import Gui, State, Markdown, Page, get_module_name_from_frame, notify
+from taipy.gui import Gui, State, Markdown, Page, get_module_name_from_state, notify
 import taipy.gui.builder as tgb
 
 # Assuming PROJECT_ROOT and UI_ACCESSIBLE_WORKSPACE might be needed for file paths
@@ -650,15 +651,16 @@ def init_ui(app_callbacks_from_app: Dict[str, Callable], initial_state_from_app:
 
     # Add all functions from this module to be available for Taipy's expression evaluation.
     # This is important if ui.py is not the main script where Gui.run() is called.
-    current_module_name = get_module_name_from_frame(inspect.currentframe())
-    for name, func in inspect.getmembers(sys.modules[current_module_name], inspect.isfunction):
-        gui.add_callable(name, func)
+    
+
+    
+
+    
 
     gui.add_shared_variables(initial_state_from_app) # Make initial state accessible to Markdown bindings
 
     # Define the page within the gui instance context
     gui.add_page("main", Markdown(main_page_md)) # Define the page with a name
-    gui._set_root_page_name("main") # Set it as the default page
 
     return gui
 
@@ -690,55 +692,66 @@ if __name__ == '__main__':
     import sys
 
     # Mock app_callbacks for standalone testing
+    mock_app_callbacks = {}
+
+    def mock_new_chat_callback_fn(s: State):
+        s.notify("info", "Mock: New chat created!")
+        setattr(s, 'messages_history', [{"role": "assistant", "content": "Hello from new mock chat!"}])
+        setattr(s, 'current_chat_id_ui', "new_mock_id")
+        setattr(s, 'chat_history_lov', [("new_mock_id", "New Mock Chat")])
+
+    def mock_switch_chat_callback_fn(s: State, chat_id: str):
+        s.notify("info", f"Mock: Switched to chat {chat_id}")
+        setattr(s, 'current_chat_id_ui', chat_id)
+        setattr(s, 'messages_history', [{"role": "assistant", "content": f"Content for {chat_id}"}])
+
+    def mock_remove_uploaded_file_callback_fn(s: State, name: str, ftype: str):
+        s.notify("info", f"Mock: File '{name}' removed.")
+        setattr(s, 'uploaded_files_display', [f for f in s.uploaded_files_display if f['name'] != name])
+
+    def mock_set_llm_settings_callback_fn(s: State, settings: Dict):
+        s.notify("info", f"Mock: LLM settings updated: {settings}")
+
+    def mock_set_long_term_memory_callback_fn(s: State, enabled: bool):
+        s.notify("info", f"Mock: Long-term memory set to {enabled}.")
+
+    def mock_forget_me_callback_fn(s: State):
+        s.notify("success", "Mock: Forget me triggered!")
+
+    def mock_handle_user_input_callback_fn(s: State, user_input: str):
+        s.notify("info", f"Mock: User input '{user_input}' sent.")
+        current_messages = list(s.messages_history)
+        current_messages.append({"role": "user", "content": user_input})
+        current_messages.append({"role": "assistant", "content": f"Mock response to: {user_input}"})
+        setattr(s, 'messages_history', current_messages)
+
+    def mock_regenerate_callback_fn(s: State):
+        s.notify("info", "Mock: Regenerate response!")
+        current_messages = [msg for msg in s.messages_history if msg['role'] == 'user']
+        if s.messages_history and s.messages_history[-1]['role'] == 'assistant':
+            current_messages = list(s.messages_history)[:-1]
+        current_messages.append({"role": "assistant", "content": "Mock: This is a regenerated response."})
+        setattr(s, 'messages_history', current_messages)
+
+    def mock_get_discussion_markdown_callback_fn(chat_id: str) -> str:
+        return f"# Mock MD for {chat_id}\n- Message 1\n- Message 2"
+
+    def mock_get_discussion_docx_callback_fn(chat_id: str) -> bytes:
+        return b"Mock DOCX content"
+
     mock_app_callbacks = {
-        'new_chat_callback': lambda s: (
-            s.notify("info", "Mock: New chat created!"),
-            setattr(s, 'messages_history', [{"role": "assistant", "content": "Hello from new mock chat!"}]),
-            setattr(s, 'current_chat_id_ui', "new_mock_id"),
-            setattr(s, 'chat_history_lov', [("new_mock_id", "New Mock Chat")])
-        ),
-        'switch_chat_callback': lambda s, chat_id: (
-            s.notify("info", f"Mock: Switched to chat {chat_id}"),
-            setattr(s, 'current_chat_id_ui', chat_id),
-            setattr(s, 'messages_history', [{"role": "assistant", "content": f"Content for {chat_id}"}])
-        ),
-
-        'process_uploaded_file_callback': None, # Placeholder, will be replaced by the function below
-        'remove_uploaded_file_callback': lambda s, name, ftype: (
-            s.notify("info", f"Mock: File '{name}' removed."),
-            setattr(s, 'uploaded_files_display', [f for f in s.uploaded_files_display if f['name'] != name])
-        ),
-        'set_llm_settings_callback': lambda s, settings: s.notify("info", f"Mock: LLM settings updated: {settings}"),
-        'set_long_term_memory_callback': lambda s, enabled: s.notify("info", f"Mock: Long-term memory set to {enabled}."),
-        'forget_me_callback': lambda s: s.notify("success", "Mock: Forget me triggered!"),
-        'rename_chat_callback': lambda s, chat_id, new_name: (
-             s.notify("success", f"Mock: Chat {chat_id} renamed to {new_name}."),
-             s.chat_metadata_ui[chat_id] = new_name,
-             # Update chat_history_lov
-             s.chat_history_lov = [(cid, s.chat_metadata_ui.get(cid, "Unknown")) for cid, _ in s.chat_history_lov if cid == chat_id] + \
-                                  [(cid, cname) for cid, cname in s.chat_history_lov if cid != chat_id] # Rebuild to reflect name change
-        ),
-        'handle_user_input_callback': lambda s, user_input: (
-            s.notify("info", f"Mock: User input '{user_input}' sent."),
-            # s.messages_history is a list, ensure direct modification triggers update
-            # Taipy typically handles list modifications well if done via state.variable = new_list
-            # or state.variable.append(new_item); state.variable = state.variable
-            current_messages = list(s.messages_history) # Create a new list copy
-            current_messages.append({"role": "user", "content": user_input})
-            current_messages.append({"role": "assistant", "content": f"Mock response to: {user_input}"})
-            setattr(s, 'messages_history', current_messages) # Assign new list to trigger Taipy update
-        ),
-        'regenerate_callback': lambda s: (
-            s.notify("info", "Mock: Regenerate response!"),
-            # Simulate removing last assistant message and adding a new one
-            current_messages = [msg for msg in s.messages_history if msg['role'] == 'user'] # Keep only user messages
-            if s.messages_history and s.messages_history[-1]['role'] == 'assistant' else list(s.messages_history),
-            current_messages.append({"role": "assistant", "content": "Mock: This is a regenerated response."}),
-            setattr(s, 'messages_history', current_messages)
-        ),
-         'get_discussion_markdown_callback': lambda chat_id: f"# Mock MD for {chat_id}\n- Message 1\n- Message 2",
-         'get_discussion_docx_callback': lambda chat_id: b"Mock DOCX content",
-
+        'new_chat_callback': mock_new_chat_callback_fn,
+        'switch_chat_callback': mock_switch_chat_callback_fn,
+        'process_uploaded_file_callback': None, # This one is defined later
+        'remove_uploaded_file_callback': mock_remove_uploaded_file_callback_fn,
+        'set_llm_settings_callback': mock_set_llm_settings_callback_fn,
+        'set_long_term_memory_callback': mock_set_long_term_memory_callback_fn,
+        'forget_me_callback': mock_forget_me_callback_fn,
+        'rename_chat_callback': None,
+        'handle_user_input_callback': mock_handle_user_input_callback_fn,
+        'regenerate_callback': mock_regenerate_callback_fn,
+        'get_discussion_markdown_callback': mock_get_discussion_markdown_callback_fn,
+        'get_discussion_docx_callback': mock_get_discussion_docx_callback_fn,
     }
 
     # Initialize state with some defaults for testing
@@ -789,12 +802,21 @@ if __name__ == '__main__':
         current_files.append({"id": name, "name": name,
                               "type": "doc" if name.endswith((".pdf",".docx")) else "df",
                               "icon": "📄" if name.endswith((".pdf",".docx")) else "📊",
-                              "actions": f"<|button|on_action=on_uploaded_file_table_action|label=Delete|class_name=taipy-error|action=delete|file_id={name}|>"})
+                              "actions": "<|button|on_action=on_uploaded_file_table_action|label=Delete|class_name=taipy-error|action=delete|file_id=" + name + "|>"})
         s.uploaded_files_display = current_files
 
+    def mock_rename_chat_callback_fn(s: State, chat_id: str, new_name: str):
+        s.notify("success", f"Mock: Chat {chat_id} renamed to {new_name}.")
+        temp_metadata = s.chat_metadata_ui.copy()
+        temp_metadata[chat_id] = new_name
+        s.chat_metadata_ui = temp_metadata
+        # Update chat_history_lov
+        s.chat_history_lov = [(cid, s.chat_metadata_ui.get(cid, "Unknown")) for cid, _ in s.chat_history_lov if cid == chat_id] + \
+                             [(cid, cname) for cid, cname in s.chat_history_lov if cid != chat_id] # Rebuild to reflect name change
 
     # Assign the actual function to the callback dictionary
     mock_app_callbacks['process_uploaded_file_callback'] = mock_process_uploaded_file_callback_fn
+    mock_app_callbacks['rename_chat_callback'] = mock_rename_chat_callback_fn
 
     gui_instance.run(run_server=True, port=5001, title="ESI Taipy UI Test", dark_mode=False, use_reloader=True)
     # if os.path.exists(temp_css_file):
