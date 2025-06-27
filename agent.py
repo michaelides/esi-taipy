@@ -192,6 +192,7 @@ Never use the word "Ah". "Ah" is prohibited.
         llm=Settings.llm,
         system_prompt=comprehensive_system_prompt
         # verbose=True, # verbose is not a standard param for FunctionAgent constructor, managed by logging or callbacks
+
     )
     # comprehensive_agent_worker = FunctionCallingAgentWorker.from_tools(
     #     tools=all_tools,
