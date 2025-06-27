@@ -2,6 +2,7 @@
 import os
 import json
 import re
+import sys # Ensure sys is imported
 import uuid
 # import extra_streamlit_components as esc # REMOVED
 from typing import List, Dict, Any, Optional, Callable, Generator, Tuple # Added Optional, Callable, Tuple
@@ -255,21 +256,12 @@ async def get_agent_response(query: str, chat_history: List[ChatMessage]) -> Gen
 
         modified_query = f"Verbosity Level: {current_verbosity}. {query}"
 
-        # FunctionAgent.chat() is async, so we await it.
-        # It might return a streaming response object or a regular response object.
-        # For simplicity, let's assume it returns an object with a .response attribute for now.
-        # If it's a streaming response, the iteration logic might need to change.
-        # LlamaIndex streaming often involves `agent.stream_chat()` which returns an `AsyncChatResponse`.
-        # Let's assume `agent.chat()` returns a non-streaming `AgentChatResponse` like object first.
         response = await agent.chat(modified_query, chat_history=chat_history)
-
         response_text = response.response if hasattr(response, 'response') else str(response)
 
-        # Simulate streaming word by word (as before)
         words = response_text.split(" ")
         for word in words:
             yield word + " "
-            # time.sleep(0.02) # time.sleep is blocking, use asyncio.sleep in async generators
             await asyncio.sleep(0.02)
 
     except Exception as e:
@@ -277,7 +269,7 @@ async def get_agent_response(query: str, chat_history: List[ChatMessage]) -> Gen
         print(f"Error getting agent response: {type(e).__name__} - {e}")
         yield error_message
 
-def create_new_chat_session_taipy(state: State): # This function itself doesn't call async code directly, but it's called by async functions
+def create_new_chat_session_taipy(state: State):
     new_chat_id = str(uuid.uuid4())
     ltm_enabled = state.long_term_memory_enabled_ui
     new_chat_name = "Current Session"
@@ -294,7 +286,7 @@ def create_new_chat_session_taipy(state: State): # This function itself doesn't 
     state.messages_history = initial_messages
     state.current_chat_id_ui = new_chat_id
     
-    messages_tuple = tuple((msg["role"], msg["content"]) for msg in initial_messages) # Create tuple for caching
+    messages_tuple = tuple((msg["role"], msg["content"]) for msg in initial_messages)
     state.suggested_prompts_ui = _cached_generate_suggested_prompts(messages_tuple)
 
     _APP_CONTEXT["chat_metadata"] = dict(state.chat_metadata_ui)
@@ -345,7 +337,6 @@ def delete_chat_session_taipy(state: State, chat_id: str):
         _APP_CONTEXT["chat_metadata"] = dict(state.chat_metadata_ui)
         save_chat_metadata(state, user_id, state.chat_metadata_ui)
         
-        # ... (Hugging Face file deletion logic remains similar, ensure it uses user_id from _APP_CONTEXT) ...
         messages_filename_in_repo = f"user_memories/{user_id}_messages.json"
         messages_hf_path = f"datasets/{HF_USER_MEMORIES_DATASET_ID}/{messages_filename_in_repo}"
         existing_messages = {}
@@ -386,7 +377,6 @@ def rename_chat_taipy(state: State, chat_id: str, new_name: str):
 
 def get_discussion_markdown(chat_id: str) -> str:
     messages = _APP_CONTEXT.get("all_chat_messages", {}).get(chat_id, [])
-    # ... (formatting logic remains the same) ...
     markdown_content = []
     for msg in messages:
         role = msg["role"].capitalize()
@@ -396,7 +386,7 @@ def get_discussion_markdown(chat_id: str) -> str:
 
 
 def get_discussion_docx(chat_id: str) -> bytes:
-    from docx import Document # Import here if not global
+    from docx import Document
     messages = _APP_CONTEXT.get("all_chat_messages", {}).get(chat_id, [])
     chat_name = _APP_CONTEXT.get("chat_metadata", {}).get(chat_id, 'Untitled Chat')
     document = Document()
@@ -413,7 +403,7 @@ def get_discussion_docx(chat_id: str) -> bytes:
     byte_stream.seek(0)
     return byte_stream.getvalue()
 
-async def handle_user_input_taipy(state: State, user_input: str | None): # Changed to async def
+async def handle_user_input_taipy(state: State, user_input: str | None):
     prompt_to_process = user_input
     if prompt_to_process:
         user_id = _APP_CONTEXT.get("user_id")
@@ -431,22 +421,19 @@ async def handle_user_input_taipy(state: State, user_input: str | None): # Chang
         state.messages_history = current_messages
 
         history_for_agent = format_chat_history(state.messages_history)
-        # response_generator = get_agent_response(prompt_to_process, chat_history=history_for_agent) # Old synchronous call
 
         assistant_response_content = ""
-        current_messages = list(state.messages_history) # Ensure it's a list
-        current_messages.append({"role": "assistant", "content": "Thinking..."}) # Add placeholder
-        state.messages_history = current_messages # Assign back to trigger update
+        current_messages = list(state.messages_history)
+        current_messages.append({"role": "assistant", "content": "Thinking..."})
+        state.messages_history = current_messages
 
-        async for chunk in get_agent_response(prompt_to_process, chat_history=history_for_agent): # Use async for
+        async for chunk in get_agent_response(prompt_to_process, chat_history=history_for_agent):
             assistant_response_content += chunk
-            # To update a list item in Taipy and ensure reactivity:
             temp_messages = list(state.messages_history)
-            if temp_messages: # Ensure list is not empty
+            if temp_messages:
                 temp_messages[-1]["content"] = assistant_response_content
-                state.messages_history = temp_messages # Assign the modified list back
-            # time.sleep(0.02) # time.sleep is blocking, using asyncio.sleep in get_agent_response
-            await asyncio.sleep(0.02) # Keep small delay for UI update cycle if needed here too
+                state.messages_history = temp_messages
+            await asyncio.sleep(0.02)
 
         if state.current_chat_id_ui:
             _APP_CONTEXT["all_chat_messages"][state.current_chat_id_ui] = list(state.messages_history)
@@ -460,14 +447,12 @@ def reset_chat_taipy(state: State):
     print("Resetting chat by creating a new session...")
     create_new_chat_session_taipy(state)
 
-async def handle_regeneration_request_taipy(state: State): # Changed to async def
+async def handle_regeneration_request_taipy(state: State):
     if not state.messages_history or state.messages_history[-1]['role'] != 'assistant':
         notify(state, "warning", "Nothing to regenerate.")
         return
 
     if len(state.messages_history) == 1:
-        # response_generator = get_agent_response("Regenerate initial greeting", []) # Old sync call
-        # new_greeting = "".join(list(response_generator)) # Consume generator
         new_greeting_chunks = [chunk async for chunk in get_agent_response("Regenerate initial greeting", [])]
         new_greeting = "".join(new_greeting_chunks)
         state.messages_history = [{"role": "assistant", "content": new_greeting}]
@@ -486,20 +471,18 @@ async def handle_regeneration_request_taipy(state: State): # Changed to async de
 
     prompt_to_regenerate = current_messages[-1]['content']
     history_for_regen = format_chat_history(current_messages[:-1])
-    # response_generator = get_agent_response(prompt_to_regenerate, chat_history=history_for_regen) # Old sync call
 
     assistant_response_content = ""
     current_messages.append({"role": "assistant", "content": "Regenerating..."})
     state.messages_history = current_messages
 
-    async for chunk in get_agent_response(prompt_to_regenerate, chat_history=history_for_regen): # Use async for
+    async for chunk in get_agent_response(prompt_to_regenerate, chat_history=history_for_regen):
         assistant_response_content += chunk
         temp_messages = list(state.messages_history)
         if temp_messages:
             temp_messages[-1]["content"] = assistant_response_content
             state.messages_history = temp_messages
-        # time.sleep(0.02) # time.sleep is blocking
-        await asyncio.sleep(0.02) # Use asyncio.sleep
+        await asyncio.sleep(0.02)
 
     if state.long_term_memory_enabled_ui and _APP_CONTEXT.get("user_id") and state.current_chat_id_ui:
         save_chat_history(state, _APP_CONTEXT["user_id"], state.current_chat_id_ui, state.messages_history)
@@ -511,7 +494,6 @@ def forget_me_and_reset_taipy(state: State):
     hf_token = os.getenv("HF_TOKEN")
     if user_id_to_delete and hf_token:
         try:
-            # ... (HF file deletion logic remains similar) ...
             metadata_hf_path = f"datasets/{HF_USER_MEMORIES_DATASET_ID}/user_memories/{user_id_to_delete}_metadata.json"
             messages_hf_path = f"datasets/{HF_USER_MEMORIES_DATASET_ID}/user_memories/{user_id_to_delete}_messages.json"
             try: fs.rm(metadata_hf_path, token=hf_token)
@@ -526,15 +508,12 @@ def forget_me_and_reset_taipy(state: State):
         state.eval_js("document.cookie = 'long_term_memory_pref=;path=/;expires=Thu, 01 Jan 1970 00:00:00 GMT';")
         state.eval_js("window.location.reload();")
 
-    # Reset _APP_CONTEXT for a clean state if page doesn't fully reload or JS fails
     _APP_CONTEXT.update({
         "user_id": None, "chat_metadata": {}, "all_chat_messages": {},
         "uploaded_documents_content": {}, "uploaded_dataframes_content": {},
         "session_control_flags_initialized": False,
          "initial_greeting_shown_for_session": False,
     })
-    # Also reset relevant Taipy state variables to their defaults
-    # This is important if the JS reload doesn't happen or isn't immediate
     ui_defaults = ui.state_vars.copy()
     for key in ["messages_history", "current_chat_id_ui", "chat_metadata_ui", "chat_history_lov", "uploaded_files_display", "file_upload_status"]:
         setattr(state, key, ui_defaults[key])
@@ -565,39 +544,20 @@ def get_project_root_for_ui() -> str:
     return PROJECT_ROOT
 
 def on_taipy_init(state: State):
-    """
-    Called when a new Taipy client session starts.
-    Attempt to load user ID and LTM preference from cookies (simulated via JS call if possible).
-    Then initialize user session data.
-    """
     print("Taipy on_init called. Initializing session...")
-    # This is where we'd ideally get cookie values via JS and then call initialize_user_session_data_taipy
-    # For now, initialize_user_session_data_taipy uses defaults or state-persisted user_id.
-    # A more robust way would be needed for true cross-session LTM via cookies.
     
-    # Let's assume LTM preference from ui.py's initial state is the default/current.
-    # And user_id is also from ui.py's initial state (None, then generated).
+    if not hasattr(state, 'long_term_memory_enabled_ui'):
+        print("DEBUG: 'long_term_memory_enabled_ui' not found on state in on_taipy_init. Setting to default from _APP_CONTEXT.")
+        state.long_term_memory_enabled_ui = _APP_CONTEXT.get("long_term_memory_enabled_pref", True)
 
-    # 'long_term_memory_enabled_ui' should be initialized on the state object
-    # by Taipy when the Gui is created with initial_state_from_app in ui.init_ui,
-    # which gets its value from initial_taipy_state in main_taipy.
-    # Thus, direct manipulation or checking with hasattr here should not be necessary
-    # if the initialization flow is correct. The AttributeError suggests it wasn't "accessible"
-    # for setattr, implying it should already exist and be managed by Taipy's state.
+    initialize_user_session_data_taipy(state)
 
-    initialize_user_session_data_taipy(state) # This function reads state.long_term_memory_enabled_ui
-
-    # Populate initial chat if needed (e.g. if no chats and LTM on, or default greeting)
-    if not state.messages_history: # If message history is empty after init
+    if not state.messages_history:
         if not _APP_CONTEXT.get("initial_greeting_shown_for_session"):
-            create_new_chat_session_taipy(state) # This will set initial greeting
+            create_new_chat_session_taipy(state)
             _APP_CONTEXT["initial_greeting_shown_for_session"] = True
     
-    # Ensure agent tools have correct search result count from settings
-    if _TAIPY_AGENT_INSTANCE and hasattr(_TAIPY_AGENT_INSTANCE, 'llm') and hasattr(_TAIPY_AGENT_INSTANCE.llm, 'context_window'): # rough check
-         # Re-init agent if search result count might have changed and needs to be passed to tools
-         # This is a bit heavy-handed. Better if tools could dynamically get this.
-         # For now, we assume setup_agent_instance reads from _APP_CONTEXT which is updated by set_llm_settings_taipy
+    if _TAIPY_AGENT_INSTANCE and hasattr(_TAIPY_AGENT_INSTANCE, 'llm') and hasattr(_TAIPY_AGENT_INSTANCE.llm, 'context_window'):
          pass
 
 
@@ -613,12 +573,9 @@ def main_taipy():
     initial_ltm_enabled = _APP_CONTEXT.get("long_term_memory_enabled_pref", True)
     initial_taipy_state["long_term_memory_enabled_ui"] = initial_ltm_enabled
 
-    # This part is a bit tricky - user_id and chat data loading depends on LTM pref
-    # which might itself come from a cookie (async via JS).
-    # For initial load, we use defaults then on_init can refine.
-    _APP_CONTEXT["user_id"] = str(uuid.uuid4()) # Placeholder, on_init will set properly
+    _APP_CONTEXT["user_id"] = str(uuid.uuid4())
     if initial_ltm_enabled:
-        user_data = _load_user_data_from_hf(_APP_CONTEXT["user_id"]) # This uses placeholder user_id first time
+        user_data = _load_user_data_from_hf(_APP_CONTEXT["user_id"])
         initial_taipy_state["chat_metadata_ui"] = user_data["metadata"]
         initial_taipy_state["chat_history_lov"] = list(user_data["metadata"].items())
         current_chat_id_to_load = next(iter(user_data["metadata"])) if user_data["metadata"] else None
@@ -634,7 +591,7 @@ def main_taipy():
     initial_taipy_state["suggested_prompts_ui"] = _cached_generate_suggested_prompts(messages_tuple if messages_tuple else tuple())
     initial_taipy_state["uploaded_files_display"] = []
     initial_taipy_state["file_upload_status"] = ""
-    initial_taipy_state["user_id"] = _APP_CONTEXT["user_id"] # Pass the generated/loaded user_id
+    initial_taipy_state["user_id"] = _APP_CONTEXT["user_id"]
 
     app_callbacks_for_ui = {
         "new_chat_callback": create_new_chat_session_taipy,
@@ -655,7 +612,7 @@ def main_taipy():
     }
 
     gui_instance = ui.init_ui(app_callbacks_for_ui, initial_taipy_state)
-    gui_instance.on_init = on_taipy_init # Register on_init function
+    gui_instance.on_init = on_taipy_init
 
     os.makedirs(UI_ACCESSIBLE_WORKSPACE, exist_ok=True)
 
@@ -694,11 +651,11 @@ def process_uploaded_file_taipy(state: State, file_name: str, file_content_bytes
                     if extracted_page_text: text_content += extracted_page_text + "\n"
                     else: print(f"Warning: Could not extract text from page {page_num + 1} of PDF '{file_name}'.")
             elif file_extension == ".docx":
-                from docx import Document # Local import for this specific use
+                from docx import Document
                 document = Document(BytesIO(file_content_bytes))
                 for para in document.paragraphs: text_content += para.text + "\n"
             elif file_extension in [".md", ".txt"]:
-                text_content = file_content_bytes.decode("utf-8", errors='replace') # Added error handling for decode
+                text_content = file_content_bytes.decode("utf-8", errors='replace')
 
             _APP_CONTEXT["uploaded_documents_content"][file_name] = text_content
             processed_type = "document"
@@ -748,14 +705,14 @@ def process_uploaded_file_taipy(state: State, file_name: str, file_content_bytes
         state.file_upload_status = f"Unsupported file type: {file_extension} for '{file_name}'."
         return
 
-    if processed_type: # Only update UI list if successfully processed for agent
+    if processed_type:
         new_file_entry = {
             "id": file_name, "name": file_name,
             "type": "doc" if processed_type == "document" else "df",
             "icon": "📄" if processed_type == "document" else "📊",
             "actions": f"<|button|on_action=on_uploaded_file_table_action|label=Delete|class_name=taipy-error|file_name={file_name}|file_type={processed_type}|>"
         }
-        current_uploaded_files = list(state.uploaded_files_display) # Make a copy for Taipy
+        current_uploaded_files = list(state.uploaded_files_display)
         current_uploaded_files.append(new_file_entry)
         state.uploaded_files_display = current_uploaded_files
     
@@ -790,19 +747,12 @@ def remove_uploaded_file_taipy(state: State, file_name: str, file_type: str):
 
 
 def set_llm_settings_taipy(state: State, settings: Dict[str, Any]):
-    _APP_CONTEXT["llm_settings"].update(settings) # Update specific settings
+    _APP_CONTEXT["llm_settings"].update(settings)
     if Settings.llm and hasattr(Settings.llm, 'temperature'):
         Settings.llm.temperature = _APP_CONTEXT["llm_settings"].get("temperature", 0.7)
 
-    # Update agent's max_search_results if it changed - this might require agent re-initialization or a setter.
-    # For now, new agent instances created via setup_agent_instance will pick up the new search_results_count.
-    # If the agent is already live, this setting change won't affect it unless explicitly handled.
-    # Consider re-calling setup_agent_instance if search_results_count changes,
-    # or make agent tools read this dynamically from _APP_CONTEXT.
     if "search_results_count" in settings:
          print(f"Search results count changed to: {settings['search_results_count']}. Agent may need re-init for this to take full effect on some tools.")
-         # Potentially re-initialize agent if this setting is critical for live agent
-         # setup_agent_instance() # This would re-init with current settings
          pass
 
 
@@ -810,7 +760,6 @@ def set_llm_settings_taipy(state: State, settings: Dict[str, Any]):
     notify(state, "info", "LLM settings updated.")
 
 
-# Make sure PROJECT_ROOT is defined before this line if __name__ == "__main__": is used for execution
 if __name__ == "__main__":
     if not os.getenv("GOOGLE_API_KEY"):
         print("⚠️ GOOGLE_API_KEY environment variable not set. The agent may not work properly.")
