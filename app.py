@@ -614,6 +614,14 @@ def main_taipy():
     gui_instance = ui.init_ui(app_callbacks_for_ui, initial_taipy_state)
     gui_instance.on_init = on_taipy_init
 
+    # Attempt to make functions from ui.py discoverable
+    import sys # Add this import if not already present at the top of app.py
+    if 'ui' in sys.modules:
+        gui_instance._set_frame(sys.modules['ui'].__dict__)
+    else:
+        print("WARNING: Could not find 'ui' module in sys.modules to set frame for Taipy GUI.")
+
+
     os.makedirs(UI_ACCESSIBLE_WORKSPACE, exist_ok=True)
 
     gui_instance.run(title="ESI Scholarly Instructor (Taipy)",
