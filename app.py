@@ -585,6 +585,12 @@ def on_taipy_init(state: State):
     # if the initialization flow is correct. The AttributeError suggests it wasn't "accessible"
     # for setattr, implying it should already exist and be managed by Taipy's state.
 
+    if not hasattr(state, 'long_term_memory_enabled_ui'):
+        print("DEBUG: 'long_term_memory_enabled_ui' not found on state in on_taipy_init. Setting to default from _APP_CONTEXT.")
+        # Initialize with a value from _APP_CONTEXT or a sensible default.
+        # This ensures the function can proceed.
+        state.long_term_memory_enabled_ui = _APP_CONTEXT.get("long_term_memory_enabled_pref", True)
+
     initialize_user_session_data_taipy(state) # This function reads state.long_term_memory_enabled_ui
 
     # Populate initial chat if needed (e.g. if no chats and LTM on, or default greeting)

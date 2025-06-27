@@ -99,20 +99,20 @@ main_page_md = """
             <|button|on_action=open_forget_me_dialog|class_name=taipy-error|>Forget Me (Delete All Data)</|button|>
         |>
         <|expandable|title=About ESI|expanded=False|
-            <|text|ESI: ESI Scholarly Instructor - Your AI partner for dissertation research.|mode=md|>
-            <|text|⚠️ Always consult your supervisor for final guidance and decisions.|mode=md|>
-            <|text|Made for NBS7091A and NBS7095x|mode=md|>
+            <|text|text="ESI: ESI Scholarly Instructor - Your AI partner for dissertation research."|mode=md|>
+            <|text|text="⚠️ Always consult your supervisor for final guidance and decisions."|mode=md|>
+            <|text|text="Made for NBS7091A and NBS7095x"|mode=md|>
         |>
     |>
 
     <|part|class_name=chat_area|
         <|navbar|>
         # 🎓 ESI: ESI Scholarly Instructor
-        <|text|Your AI partner for brainstorming and structuring your dissertation research|mode=md|>
+        <|text|text="Your AI partner for brainstorming and structuring your dissertation research"|mode=md|>
 
         <div class="chat-container" style="height: 60vh; overflow-y: auto; border: 1px solid #ccc; padding: 10px; margin-bottom:10px;">
         <|part|render={len(messages_history) > 0}|
-            <|repeater|data={messages_history}|
+            <|repeater|data={messages_history}|>
                 <|layout|columns=auto 1fr|class_name={class_name_for_message(item)}|
                     <|text|{get_avatar_for_message(item)}|class_name=avatar|>
                     <|text|{get_content_for_message(item)}|mode=md|class_name=message_content|>
@@ -672,21 +672,40 @@ def init_ui(app_callbacks_from_app: Dict[str, Callable], initial_state_from_app:
 
     gui.add_shared_variables(initial_state_from_app) # Make initial state accessible to Markdown bindings
 
+    # Explicitly provide functions to the page context
+    page_callables = {
+        # Functions used in expressions
+        "class_name_for_message": class_name_for_message,
+        "get_avatar_for_message": get_avatar_for_message,
+        "get_content_for_message": get_content_for_message,
+        "has_download_or_image": has_download_or_image,
+        "get_download_or_image_html": get_download_or_image_html,
+        "has_rag_sources": has_rag_sources,
+        "get_rag_sources_html": get_rag_sources_html,
+        "is_last_assistant_message": is_last_assistant_message,
+        # Adapter
+        "chat_history_adapter": chat_history_adapter,
+        # Callbacks defined in ui.py (Taipy usually finds these by name, but explicit is safer)
+        "new_chat_action": new_chat_action,
+        "on_chat_menu_action": on_chat_menu_action,
+        "request_rename_chat_action": request_rename_chat_action,
+        "request_delete_chat_action": request_delete_chat_action,
+        "download_chat_md_action": download_chat_md_action,
+        "download_chat_docx_action": download_chat_docx_action,
+        "handle_file_upload_action": handle_file_upload_action,
+        "on_uploaded_file_table_action": on_uploaded_file_table_action,
+        "on_llm_setting_change": on_llm_setting_change,
+        "open_forget_me_dialog": open_forget_me_dialog,
+        "dialog_action_forget_me": dialog_action_forget_me,
+        "dialog_action_rename_chat": dialog_action_rename_chat,
+        "on_suggested_prompt_action": on_suggested_prompt_action,
+        "on_chat_input_action": on_chat_input_action,
+        "copy_message_action": copy_message_action,
+        "regenerate_response_action": regenerate_response_action
+    }
+
     # Define the page within the gui instance context
-    # Functions like class_name_for_message should now be discoverable from ui.py's context
-    gui.add_page("main", Markdown(main_page_md),
-                 # Explicitly provide functions to the page if _set_frame isn't enough
-                 # or if preferred. These are functions used in the Markdown.
-                 # Note: This makes them available to *this page*. _set_frame is more global for the Gui instance.
-                 # Binding them here ensures they are known for this page.
-                 # This is a more robust way for page-specific functions.
-                 # However, _set_frame should ideally cover this. Let's try _set_frame first.
-                 # If warnings persist, we can add them here explicitly.
-                 # Example:
-                 # class_name_for_message=class_name_for_message,
-                 # get_avatar_for_message=get_avatar_for_message,
-                 # ... and so on for all functions used in main_page_md
-                 )
+    gui.add_page("main", Markdown(main_page_md), **page_callables)
 
     return gui
 
