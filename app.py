@@ -2,6 +2,7 @@
 import os
 import json
 import re
+import sys # Ensure sys is imported
 import uuid
 # import extra_streamlit_components as esc # REMOVED
 from typing import List, Dict, Any, Optional, Callable, Generator, Tuple # Added Optional, Callable, Tuple
@@ -662,6 +663,14 @@ def main_taipy():
 
     gui_instance = ui.init_ui(app_callbacks_for_ui, initial_taipy_state)
     gui_instance.on_init = on_taipy_init # Register on_init function
+
+    # Attempt to make functions from ui.py discoverable
+    import sys # Add this import if not already present at the top of app.py
+    if 'ui' in sys.modules:
+        gui_instance._set_frame(sys.modules['ui'].__dict__)
+    else:
+        print("WARNING: Could not find 'ui' module in sys.modules to set frame for Taipy GUI.")
+
 
     os.makedirs(UI_ACCESSIBLE_WORKSPACE, exist_ok=True)
 

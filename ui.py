@@ -705,7 +705,10 @@ def init_ui(app_callbacks_from_app: Dict[str, Callable], initial_state_from_app:
     }
 
     # Define the page within the gui instance context
-    gui.add_page("main", Markdown(main_page_md), **page_callables)
+    # Functions like class_name_for_message (defined in this ui.py module)
+    # should be discoverable by Taipy when it parses main_page_md,
+    # as this module should be in its search path.
+    gui.add_page("main", Markdown(main_page_md))
 
     return gui
 
