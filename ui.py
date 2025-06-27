@@ -652,15 +652,39 @@ def init_ui(app_callbacks_from_app: Dict[str, Callable], initial_state_from_app:
     # Add all functions from this module to be available for Taipy's expression evaluation.
     # This is important if ui.py is not the main script where Gui.run() is called.
     
+    # Set the frame for the Gui instance to the current module's globals.
+    # This helps Taipy resolve functions and variables used in Markdown expressions.
+    # sys.modules[__name__] refers to the current module (ui.py).
+    # We pass its __dict__ which contains the module's symbol table (globals).
+    # Alternatively, if Gui has a method like `set_module_context` or similar, that would be preferred.
+    # Using _set_frame as it was used in the __main__ block for testing.
+    if hasattr(gui, "_set_frame"):
+        gui._set_frame(sys.modules[__name__].__dict__)
+    elif hasattr(gui, "add_module_context"): # Check for a hypothetical public API
+        gui.add_module_context(sys.modules[__name__])
+    else:
+        # If no explicit way, Taipy usually infers from where Gui() is called or pages are added.
+        # This explicit step is a fallback/enhancement.
+        print("Warning: Could not explicitly set module context for Taipy GUI in ui.init_ui. Relaying on Taipy's default discovery.")
 
-    
-
-    
 
     gui.add_shared_variables(initial_state_from_app) # Make initial state accessible to Markdown bindings
 
     # Define the page within the gui instance context
-    gui.add_page("main", Markdown(main_page_md)) # Define the page with a name
+    # Functions like class_name_for_message should now be discoverable from ui.py's context
+    gui.add_page("main", Markdown(main_page_md),
+                 # Explicitly provide functions to the page if _set_frame isn't enough
+                 # or if preferred. These are functions used in the Markdown.
+                 # Note: This makes them available to *this page*. _set_frame is more global for the Gui instance.
+                 # Binding them here ensures they are known for this page.
+                 # This is a more robust way for page-specific functions.
+                 # However, _set_frame should ideally cover this. Let's try _set_frame first.
+                 # If warnings persist, we can add them here explicitly.
+                 # Example:
+                 # class_name_for_message=class_name_for_message,
+                 # get_avatar_for_message=get_avatar_for_message,
+                 # ... and so on for all functions used in main_page_md
+                 )
 
     return gui
 
