@@ -57,6 +57,7 @@ state_vars = {
 # The `chat` control is central for message display.
 # Other controls like `menu`, `file_selector`, `slider`, `input` map to Streamlit equivalents.
 
+
 main_page_md = """
 <|toggle|theme|>
 <|layout|columns=300px 1fr|gap=10px|
@@ -83,20 +84,20 @@ main_page_md = """
             <|button|on_action=open_forget_me_dialog|class_name=taipy-error|>Forget Me (Delete All Data)</|button|>
         |>
         <|expandable|title=About ESI|expanded=False|
-            <|text|value=ESI: ESI Scholarly Instructor - Your AI partner for dissertation research.|mode=md|>
-            <|text|value=⚠️ Always consult your supervisor for final guidance and decisions.|mode=md|>
-            <|text|value=Made for NBS7091A and NBS7095x|mode=md|>
+            <|text|ESI: ESI Scholarly Instructor - Your AI partner for dissertation research.|mode=md|>
+            <|text|⚠️ Always consult your supervisor for final guidance and decisions.|mode=md|>
+            <|text|Made for NBS7091A and NBS7095x|mode=md|>
         |>
     |>
 
     <|part|class_name=chat_area|
         <|navbar|>
         # 🎓 ESI: ESI Scholarly Instructor
-        <|text|value=Your AI partner for brainstorming and structuring your dissertation research|mode=md|>
+        <|text|Your AI partner for brainstorming and structuring your dissertation research|mode=md|>
 
         <div class="chat-container" style="height: 60vh; overflow-y: auto; border: 1px solid #ccc; padding: 10px; margin-bottom:10px;">
         <|part|render={len(messages_history) > 0}|
-            <|repeater|data={messages_history}|>
+            <|repeater|data={messages_history}|
                 <|layout|columns=auto 1fr|class_name={class_name_for_message(item)}|
                     <|text|{get_avatar_for_message(item)}|class_name=avatar|>
                     <|text|{get_content_for_message(item)}|mode=md|class_name=message_content|>
@@ -574,8 +575,6 @@ def regenerate_response_action(state: State, id: str, action: str, payload: Dict
         notify(state, "error", "Regeneration callback not configured.")
 
 # --- GUI Instance and Initialization ---
-_gui_instance: Optional[Gui] = None
-
 def get_gui_instance(force_new: bool = False) -> Gui:
     """Gets the Gui instance, creating if necessary."""
     global _gui_instance
@@ -656,56 +655,29 @@ def init_ui(app_callbacks_from_app: Dict[str, Callable], initial_state_from_app:
     # Taipy should be able to discover functions and variables from this module automatically
     # when the Gui is run from app.py, as long as ui.py is imported correctly.
 
-    # Embed GLOBAL_CSS directly into the Markdown content
-    full_main_page_md = f"<style>{GLOBAL_CSS}</style>\n{main_page_md}"
-
     gui.add_shared_variables(initial_state_from_app) # Make initial state accessible to Markdown bindings
 
     # Define the page within the gui instance context
-    # Explicitly pass helper functions used in Markdown to the page context
-    page_functions = {
-        "class_name_for_message": class_name_for_message,
-        "get_avatar_for_message": get_avatar_for_message,
-        "get_content_for_message": get_content_for_message,
-        "has_download_or_image": has_download_or_image,
-        "get_download_or_image_html": get_download_or_image_html,
-        "has_rag_sources": has_rag_sources,
-        "get_rag_sources_html": get_rag_sources_html,
-        "is_last_assistant_message": is_last_assistant_message,
-        "chat_history_adapter": chat_history_adapter
-        # Add any other functions from ui.py that are directly called from main_page_md
-        # Callbacks like on_action=... are usually discovered automatically if they are in this module.
-    }
-
-    gui.add_page(
-        name="main",
-        page=Markdown(full_main_page_md),
-        **page_functions
-    )
+    # Functions like class_name_for_message should now be discoverable from ui.py's context
+    gui.add_page("main", Markdown(main_page_md),
+                 # Explicitly provide functions to the page if _set_frame isn't enough
+                 # or if preferred. These are functions used in the Markdown.
+                 # Note: This makes them available to *this page*. _set_frame is more global for the Gui instance.
+                 # Binding them here ensures they are known for this page.
+                 # This is a more robust way for page-specific functions.
+                 # However, _set_frame should ideally cover this. Let's try _set_frame first.
+                 # If warnings persist, we can add them here explicitly.
+                 # Example:
+                 # class_name_for_message=class_name_for_message,
+                 # get_avatar_for_message=get_avatar_for_message,
+                 # ... and so on for all functions used in main_page_md
+                 )
 
     return gui
 
 
 # Global style (can be refined)
-GLOBAL_CSS = """
-.sidebar { background-color: #f0f2f6; padding: 1em; border-radius: 8px; }
-.chat_area { padding: 1em; }
-.chat_input input { border-radius: 15px; } /* Style Taipy input within chat_input class */
-.chat_input button { border-radius: 15px; }
-.taipy-error { background-color: #ff4d4d !important; color: white !important; }
-.taipy-error:hover { background-color: #cc0000 !important; }
-.user_message_layout { margin-bottom: 10px; padding: 8px; background-color: #e6f3ff; border-radius: 8px 8px 0 8px; float: right; clear: both; max-width: 70%; }
-.assistant_message_layout { margin-bottom: 10px; padding: 8px; background-color: #f0f0f0; border-radius: 8px 8px 8px 0; float: left; clear: both; max-width: 70%; }
-.avatar { font-size: 1.5em; margin-right: 8px; }
-.message_content p { margin: 0; } /* Remove default paragraph margins in messages */
-.suggested_prompts_layout button { background-color: #e0e0e0; border: none; padding: 8px 12px; border-radius: 15px; }
-.suggested_prompts_layout button:hover { background-color: #c0c0c0; }
-.small_button { padding: 2px 5px !important; font-size: 0.8em !important; margin-left: 5px !important; }
-/* Add more Taipy-specific styling as needed */
-"""
-# Note: Applying CSS might need Gui(css_file="path/to/style.css") or embedding in Markdown.
-# For now, this string can be written to a temp file or passed if Taipy API allows.
-# Taipy typically uses a css_file argument in Gui constructor.
+
 
 if __name__ == '__main__':
     # This part is for testing ui.py independently.

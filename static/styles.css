@@ -1,0 +1,15 @@
+
+.sidebar { background-color: #f0f2f6; padding: 1em; border-radius: 8px; }
+.chat_area { padding: 1em; }
+.chat_input input { border-radius: 15px; } /* Style Taipy input within chat_input class */
+.chat_input button { border-radius: 15px; }
+.taipy-error { background-color: #ff4d4d !important; color: white !important; }
+.taipy-error:hover { background-color: #cc0000 !important; }
+.user_message_layout { margin-bottom: 10px; padding: 8px; background-color: #e6f3ff; border-radius: 8px 8px 0 8px; float: right; clear: both; max-width: 70%; }
+.assistant_message_layout { margin-bottom: 10px; padding: 8px; background-color: #f0f0f0; border-radius: 8px 8px 8px 0; float: left; clear: both; max-width: 70%; }
+.avatar { font-size: 1.5em; margin-right: 8px; }
+.message_content p { margin: 0; } /* Remove default paragraph margins in messages */
+.suggested_prompts_layout button { background-color: #e0e0e0; border: none; padding: 8px 12px; border-radius: 15px; }
+.suggested_prompts_layout button:hover { background-color: #c0c0c0; }
+.small_button { padding: 2px 5px !important; font-size: 0.8em !important; margin-left: 5px !important; }
+/* Add more Taipy-specific styling as needed */
