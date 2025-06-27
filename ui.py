@@ -35,9 +35,6 @@ def init_ui(app_callbacks_from_app: Dict[str, Callable], initial_state_from_app:
     
     # Add shared variables (even for minimal state)
     # This ensures Taipy knows about 'simple_message' from the initial state
-    gui.add_shared_variables(initial_state_from_app)
-
-
     # Define the minimal page
     # No complex callables needed for this minimal version
     gui.add_page("main", Markdown(main_page_md))
