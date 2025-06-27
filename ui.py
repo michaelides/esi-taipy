@@ -25,6 +25,18 @@ _app_callbacks: Dict[str, Callable] = {}
 # --- Global GUI Instance ---
 _gui_instance: Optional[Gui] = None
 
+# --- Global CSS (can be expanded) ---
+GLOBAL_CSS = """
+/* Add any global styles here. For example:
+body {
+    font-family: sans-serif;
+}
+.taipy-button {
+    margin: 5px;
+}
+*/
+"""
+
 # --- Taipy State Variables ---
 # These mirror the Streamlit session_state variables relevant to the UI.
 # Their initial values will be set in `create_gui` and then managed by Taipy.
