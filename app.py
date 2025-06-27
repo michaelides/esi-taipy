@@ -557,6 +557,18 @@ def on_taipy_init(state: State):
     
     # Let's assume LTM preference from ui.py's initial state is the default/current.
     # And user_id is also from ui.py's initial state (None, then generated).
+
+    # Ensure 'long_term_memory_enabled_ui' is initialized on the state object
+    # before being accessed by initialize_user_session_data_taipy.
+    # Default to the value in ui.state_vars if not already on state.
+    if not hasattr(state, 'long_term_memory_enabled_ui'):
+        # Fallback to _APP_CONTEXT as it's set during main_taipy's initial_taipy_state setup
+        # or directly from ui.state_vars as a last resort.
+        initial_ltm_pref = _APP_CONTEXT.get("long_term_memory_enabled_pref",
+                                            ui.state_vars.get("long_term_memory_enabled_ui", False))
+        setattr(state, 'long_term_memory_enabled_ui', initial_ltm_pref)
+        print(f"Taipy on_init: Explicitly set state.long_term_memory_enabled_ui to {initial_ltm_pref}")
+
     initialize_user_session_data_taipy(state)
 
     # Populate initial chat if needed (e.g. if no chats and LTM on, or default greeting)
