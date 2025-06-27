@@ -11,6 +11,7 @@ from PyPDF2 import PdfReader # For PDF processing
 # from docx import Document # Imported lower for get_discussion_docx, and locally in process_uploaded_file_taipy
 from io import BytesIO
 import time # Added for simulated streaming and DOCX export timestamp
+import asyncio # Added for asyncio.sleep
 
 from llama_index.core.llms import ChatMessage, MessageRole
 from llama_index.core import Settings
@@ -238,30 +239,45 @@ def format_chat_history(ui_messages: List[Dict[str, Any]]) -> List[ChatMessage]:
         history.append(ChatMessage(role=role, content=msg["content"]))
     return history
 
-def get_agent_response(query: str, chat_history: List[ChatMessage]) -> Generator[str, None, None]:
+async def get_agent_response(query: str, chat_history: List[ChatMessage]) -> Generator[str, None, None]: # Changed to async def, still a generator
     global _TAIPY_AGENT_INSTANCE
     if not _TAIPY_AGENT_INSTANCE:
         yield "Error: Agent not initialized."
         return
+
     agent = _TAIPY_AGENT_INSTANCE
     try:
         current_temperature = _APP_CONTEXT.get("llm_settings", {}).get("temperature", 0.7)
         current_verbosity = _APP_CONTEXT.get("llm_settings", {}).get("verbosity", 3)
+
         if Settings.llm and hasattr(Settings.llm, 'temperature'):
             Settings.llm.temperature = current_temperature
+
         modified_query = f"Verbosity Level: {current_verbosity}. {query}"
-        response = agent.chat(modified_query, chat_history=chat_history)
+
+        # FunctionAgent.chat() is async, so we await it.
+        # It might return a streaming response object or a regular response object.
+        # For simplicity, let's assume it returns an object with a .response attribute for now.
+        # If it's a streaming response, the iteration logic might need to change.
+        # LlamaIndex streaming often involves `agent.stream_chat()` which returns an `AsyncChatResponse`.
+        # Let's assume `agent.chat()` returns a non-streaming `AgentChatResponse` like object first.
+        response = await agent.chat(modified_query, chat_history=chat_history)
+
         response_text = response.response if hasattr(response, 'response') else str(response)
+
+        # Simulate streaming word by word (as before)
         words = response_text.split(" ")
         for word in words:
             yield word + " "
-            time.sleep(0.02) # Adjusted for potentially faster UI updates
+            # time.sleep(0.02) # time.sleep is blocking, use asyncio.sleep in async generators
+            await asyncio.sleep(0.02)
+
     except Exception as e:
         error_message = f"I apologize, but I encountered an error: {str(e)}"
         print(f"Error getting agent response: {type(e).__name__} - {e}")
         yield error_message
 
-def create_new_chat_session_taipy(state: State):
+def create_new_chat_session_taipy(state: State): # This function itself doesn't call async code directly, but it's called by async functions
     new_chat_id = str(uuid.uuid4())
     ltm_enabled = state.long_term_memory_enabled_ui
     new_chat_name = "Current Session"
@@ -397,7 +413,7 @@ def get_discussion_docx(chat_id: str) -> bytes:
     byte_stream.seek(0)
     return byte_stream.getvalue()
 
-def handle_user_input_taipy(state: State, user_input: str | None):
+async def handle_user_input_taipy(state: State, user_input: str | None): # Changed to async def
     prompt_to_process = user_input
     if prompt_to_process:
         user_id = _APP_CONTEXT.get("user_id")
@@ -415,21 +431,22 @@ def handle_user_input_taipy(state: State, user_input: str | None):
         state.messages_history = current_messages
 
         history_for_agent = format_chat_history(state.messages_history)
-        response_generator = get_agent_response(prompt_to_process, chat_history=history_for_agent)
+        # response_generator = get_agent_response(prompt_to_process, chat_history=history_for_agent) # Old synchronous call
 
         assistant_response_content = ""
         current_messages = list(state.messages_history) # Ensure it's a list
         current_messages.append({"role": "assistant", "content": "Thinking..."}) # Add placeholder
         state.messages_history = current_messages # Assign back to trigger update
 
-        for chunk in response_generator:
+        async for chunk in get_agent_response(prompt_to_process, chat_history=history_for_agent): # Use async for
             assistant_response_content += chunk
             # To update a list item in Taipy and ensure reactivity:
             temp_messages = list(state.messages_history)
             if temp_messages: # Ensure list is not empty
                 temp_messages[-1]["content"] = assistant_response_content
                 state.messages_history = temp_messages # Assign the modified list back
-            time.sleep(0.02)
+            # time.sleep(0.02) # time.sleep is blocking, using asyncio.sleep in get_agent_response
+            await asyncio.sleep(0.02) # Keep small delay for UI update cycle if needed here too
 
         if state.current_chat_id_ui:
             _APP_CONTEXT["all_chat_messages"][state.current_chat_id_ui] = list(state.messages_history)
@@ -443,14 +460,16 @@ def reset_chat_taipy(state: State):
     print("Resetting chat by creating a new session...")
     create_new_chat_session_taipy(state)
 
-def handle_regeneration_request_taipy(state: State):
+async def handle_regeneration_request_taipy(state: State): # Changed to async def
     if not state.messages_history or state.messages_history[-1]['role'] != 'assistant':
         notify(state, "warning", "Nothing to regenerate.")
         return
 
     if len(state.messages_history) == 1:
-        response_generator = get_agent_response("Regenerate initial greeting", [])
-        new_greeting = "".join(list(response_generator)) # Consume generator
+        # response_generator = get_agent_response("Regenerate initial greeting", []) # Old sync call
+        # new_greeting = "".join(list(response_generator)) # Consume generator
+        new_greeting_chunks = [chunk async for chunk in get_agent_response("Regenerate initial greeting", [])]
+        new_greeting = "".join(new_greeting_chunks)
         state.messages_history = [{"role": "assistant", "content": new_greeting}]
         if state.long_term_memory_enabled_ui and _APP_CONTEXT.get("user_id") and state.current_chat_id_ui:
             save_chat_history(state, _APP_CONTEXT["user_id"], state.current_chat_id_ui, state.messages_history)
@@ -467,19 +486,20 @@ def handle_regeneration_request_taipy(state: State):
 
     prompt_to_regenerate = current_messages[-1]['content']
     history_for_regen = format_chat_history(current_messages[:-1])
-    response_generator = get_agent_response(prompt_to_regenerate, chat_history=history_for_regen)
+    # response_generator = get_agent_response(prompt_to_regenerate, chat_history=history_for_regen) # Old sync call
 
     assistant_response_content = ""
     current_messages.append({"role": "assistant", "content": "Regenerating..."})
     state.messages_history = current_messages
 
-    for chunk in response_generator:
+    async for chunk in get_agent_response(prompt_to_regenerate, chat_history=history_for_regen): # Use async for
         assistant_response_content += chunk
         temp_messages = list(state.messages_history)
         if temp_messages:
             temp_messages[-1]["content"] = assistant_response_content
             state.messages_history = temp_messages
-        time.sleep(0.02)
+        # time.sleep(0.02) # time.sleep is blocking
+        await asyncio.sleep(0.02) # Use asyncio.sleep
 
     if state.long_term_memory_enabled_ui and _APP_CONTEXT.get("user_id") and state.current_chat_id_ui:
         save_chat_history(state, _APP_CONTEXT["user_id"], state.current_chat_id_ui, state.messages_history)
@@ -558,18 +578,14 @@ def on_taipy_init(state: State):
     # Let's assume LTM preference from ui.py's initial state is the default/current.
     # And user_id is also from ui.py's initial state (None, then generated).
 
-    # Ensure 'long_term_memory_enabled_ui' is initialized on the state object
-    # before being accessed by initialize_user_session_data_taipy.
-    # Default to the value in ui.state_vars if not already on state.
-    if not hasattr(state, 'long_term_memory_enabled_ui'):
-        # Fallback to _APP_CONTEXT as it's set during main_taipy's initial_taipy_state setup
-        # or directly from ui.state_vars as a last resort.
-        initial_ltm_pref = _APP_CONTEXT.get("long_term_memory_enabled_pref",
-                                            ui.state_vars.get("long_term_memory_enabled_ui", False))
-        setattr(state, 'long_term_memory_enabled_ui', initial_ltm_pref)
-        print(f"Taipy on_init: Explicitly set state.long_term_memory_enabled_ui to {initial_ltm_pref}")
+    # 'long_term_memory_enabled_ui' should be initialized on the state object
+    # by Taipy when the Gui is created with initial_state_from_app in ui.init_ui,
+    # which gets its value from initial_taipy_state in main_taipy.
+    # Thus, direct manipulation or checking with hasattr here should not be necessary
+    # if the initialization flow is correct. The AttributeError suggests it wasn't "accessible"
+    # for setattr, implying it should already exist and be managed by Taipy's state.
 
-    initialize_user_session_data_taipy(state)
+    initialize_user_session_data_taipy(state) # This function reads state.long_term_memory_enabled_ui
 
     # Populate initial chat if needed (e.g. if no chats and LTM on, or default greeting)
     if not state.messages_history: # If message history is empty after init
