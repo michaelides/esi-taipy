@@ -22,6 +22,9 @@ PROJECT_ROOT = os.path.abspath(os.path.dirname(__file__)) # This will be ui.py's
 # This is a simple way to make them accessible to Taipy callbacks defined in this module.
 _app_callbacks: Dict[str, Callable] = {}
 
+# --- Global GUI Instance ---
+_gui_instance: Optional[Gui] = None
+
 # --- Taipy State Variables ---
 # These mirror the Streamlit session_state variables relevant to the UI.
 # Their initial values will be set in `create_gui` and then managed by Taipy.
