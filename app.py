@@ -546,11 +546,11 @@ def get_project_root_for_ui() -> str:
 def on_taipy_init(state: State):
     print("Taipy on_init called. Initializing session...")
     
-    if not hasattr(state, 'long_term_memory_enabled_ui'):
-        print("DEBUG: 'long_term_memory_enabled_ui' not found on state in on_taipy_init. Setting to default from _APP_CONTEXT.")
-        state.long_term_memory_enabled_ui = _APP_CONTEXT.get("long_term_memory_enabled_pref", True)
+    # Removed defensive block for long_term_memory_enabled_ui,
+    # expecting it to be correctly initialized via globals in gui.run()
 
     initialize_user_session_data_taipy(state)
+
 
     if not state.messages_history:
         if not _APP_CONTEXT.get("initial_greeting_shown_for_session"):
@@ -614,13 +614,6 @@ def main_taipy():
     gui_instance = ui.init_ui(app_callbacks_for_ui, initial_taipy_state)
     gui_instance.on_init = on_taipy_init
 
-    # Attempt to make functions from ui.py discoverable
-    import sys # Add this import if not already present at the top of app.py
-    if 'ui' in sys.modules:
-        gui_instance._set_frame(sys.modules['ui'].__dict__)
-    else:
-        print("WARNING: Could not find 'ui' module in sys.modules to set frame for Taipy GUI.")
-
 
     os.makedirs(UI_ACCESSIBLE_WORKSPACE, exist_ok=True)
 
@@ -628,7 +621,8 @@ def main_taipy():
                      dark_mode=False,
                      use_reloader=True,
                      port=5005,
-                     host="0.0.0.0")
+                     host="0.0.0.0",
+                     globals=initial_taipy_state)
 
 
 def process_uploaded_file_taipy(state: State, file_name: str, file_content_bytes: bytes):
